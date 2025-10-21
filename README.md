@@ -23,9 +23,9 @@ Public Next.js site that surfaces upcoming earnings events from the Primer Repor
    ```bash
    ./scripts/print-database-url.sh > .env.local
    ```
-   The script prints the Supabase Postgres URL using `SUPABASE_PROJECT_ID` and `SUPABASE_DB_PASSWORD` from the keychain. If you prefer to edit manually, ensure `DATABASE_URL` includes `sslmode=require`.
-5. Start the app: `npm run dev`
-6. Visit http://localhost:3000 for the earnings calendar.
+   The script reads `DATABASE_URL` from the keychain if it exists. Otherwise it builds the URL from `SUPABASE_PROJECT_ID`/`SUPABASE_DB_PASSWORD`, ensuring the password is encoded and appending `sslmode=no-verify` so the Node `pg` client accepts Supabase's self-signed CA while running locally.
+5. Start the dev server: `npm run dev` (add `-- --hostname 0.0.0.0 --port 4000` if the default port 3000 is already taken).
+6. Visit http://localhost:3000 (or whichever port you passed) for the earnings calendar with hot reload.
 
 ## Testing & Linting
 - `npm run lint` – Next.js/ESLint checks
@@ -40,7 +40,7 @@ Queries live in `src/lib/queries.ts` and are executed server-side only. They joi
 The Next.js pages run with `revalidate = 60`, so fresh data is pulled roughly once a minute in production. No secrets are ever sent to the client – only pre-rendered JSON.
 
 ## Environment Variables
-- `DATABASE_URL` – Supabase Postgres connection string with `sslmode=require`
+- `DATABASE_URL` – Supabase Postgres connection string. For local development the helper script will pull the keychain value (or synthesize one) with `sslmode=no-verify` so the pg client skips the self-signed CA. Production deployments can continue to use the standard Render configuration.
 
 See `.env.example` for the required key. Render deployment will also need the same variable configured. The helper script never persists secrets; it only echoes the computed URL so you can pipe it into `.env.local` or your deployment workflow.
 
