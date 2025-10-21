@@ -4,6 +4,11 @@ import { useMemo, useState } from "react";
 import { parseISO, format } from "date-fns";
 import type { EarningsEvent } from "@/lib/types";
 
+type RequestModalState = {
+  isOpen: boolean;
+  event: EarningsEvent | null;
+};
+
 type Props = {
   events: EarningsEvent[];
 };
@@ -70,6 +75,12 @@ export function CalendarView({ events }: Props) {
   });
   const [showFilters, setShowFilters] = useState(false);
   const [collapsedDays, setCollapsedDays] = useState<CollapsedDays>({});
+  const [requestModal, setRequestModal] = useState<RequestModalState>({
+    isOpen: false,
+    event: null,
+  });
+  const [email, setEmail] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Extract unique values for dropdowns
   const filterOptions = useMemo(() => {
@@ -228,6 +239,46 @@ export function CalendarView({ events }: Props) {
     }));
   };
 
+  const openRequestModal = (event: EarningsEvent) => {
+    setRequestModal({ isOpen: true, event });
+    setEmail("");
+  };
+
+  const closeRequestModal = () => {
+    setRequestModal({ isOpen: false, event: null });
+    setEmail("");
+    setIsSubmitting(false);
+  };
+
+  const handleSubmitRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!requestModal.event || !email) return;
+
+    setIsSubmitting(true);
+
+    const event = requestModal.event;
+    const subject = `Request Earnings Preview for ${event.company.ticker ?? event.company.friendlyName ?? event.company.isin}`;
+    const body = `Hi,
+
+I would like to request an earnings preview for:
+
+Company: ${event.company.friendlyName ?? event.company.name}
+Ticker: ${event.company.ticker ?? 'N/A'}
+Earnings Date: ${formatDisplayDate(event.date)}
+
+Please send the preview to: ${email}
+
+Thank you!`;
+
+    // Open mailto link
+    window.location.href = `mailto:hello@primerapp.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+    // Close modal after a short delay
+    setTimeout(() => {
+      closeRequestModal();
+    }, 500);
+  };
+
   return (
     <div className="space-y-4">
       {/* Search and Filter Controls */}
@@ -363,11 +414,11 @@ export function CalendarView({ events }: Props) {
 
             {/* Score Filters */}
             <div>
-              <h3 className="text-xs font-bold text-foreground mb-2 uppercase tracking-wider">AI Score Filters</h3>
+              <h3 className="text-xs font-bold text-foreground mb-2 uppercase tracking-wider">AI-Forecast Filters</h3>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div>
                   <label htmlFor="minOverall" className="block text-xs font-semibold text-foreground mb-1.5">
-                    Min Overall Score
+                    Min Overall
                   </label>
                   <input
                     id="minOverall"
@@ -384,7 +435,7 @@ export function CalendarView({ events }: Props) {
 
                 <div>
                   <label htmlFor="minNews" className="block text-xs font-semibold text-foreground mb-1.5">
-                    Min News Score
+                    Min News
                   </label>
                   <input
                     id="minNews"
@@ -401,7 +452,7 @@ export function CalendarView({ events }: Props) {
 
                 <div>
                   <label htmlFor="minReadx" className="block text-xs font-semibold text-foreground mb-1.5">
-                    Min ReadX Score
+                    Min ReadX
                   </label>
                   <input
                     id="minReadx"
@@ -488,45 +539,71 @@ export function CalendarView({ events }: Props) {
                     <li key={`${event.id}-${event.company.isin}`} className="transition-all hover:bg-card/50">
                       <div className="px-4 py-2.5">
                         <div className="flex items-center gap-3">
-                          {/* Ticker */}
+                          {/* Ticker - now with violet color */}
                           {event.company.ticker && (
-                            <span className="inline-flex items-center rounded-md bg-primary/10 px-2.5 py-1 text-xs font-mono font-bold text-primary border border-primary/20 shrink-0">
+                            <span className="inline-flex items-center rounded-md bg-violet/15 px-2.5 py-1 text-xs font-mono font-bold text-violet-400 border border-violet-500/30 shrink-0">
                               {event.company.ticker}
                             </span>
                           )}
 
                           {/* Company Name */}
-                          <span className="text-sm font-semibold text-foreground truncate">
+                          <span className="text-sm font-semibold text-foreground truncate max-w-[200px]" title={event.company.friendlyName ?? event.company.name ?? "Company name unavailable"}>
                             {event.company.friendlyName ?? event.company.name ?? "Company name unavailable"}
                           </span>
 
-                          {/* Metadata Tags */}
-                          <div className="flex flex-wrap items-center gap-2 ml-auto">
-                            {/* AI Scores - only show if preview exists and scores are available */}
-                            {event.preview?.scores && (
-                              <>
-                                {event.preview.scores.overall !== null && (
-                                  <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold border shrink-0 ${getScoreColor(event.preview.scores.overall).bg} ${getScoreColor(event.preview.scores.overall).text} ${getScoreColor(event.preview.scores.overall).border}`}>
-                                    <span className="opacity-60">Overall:</span> {formatScore(event.preview.scores.overall)}
-                                  </span>
-                                )}
-                                {event.preview.scores.news !== null && (
-                                  <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold border shrink-0 ${getScoreColor(event.preview.scores.news).bg} ${getScoreColor(event.preview.scores.news).text} ${getScoreColor(event.preview.scores.news).border}`}>
-                                    <span className="opacity-60">News:</span> {formatScore(event.preview.scores.news)}
-                                  </span>
-                                )}
-                                {event.preview.scores.readx !== null && (
-                                  <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold border shrink-0 ${getScoreColor(event.preview.scores.readx).bg} ${getScoreColor(event.preview.scores.readx).text} ${getScoreColor(event.preview.scores.readx).border}`}>
-                                    <span className="opacity-60">ReadX:</span> {formatScore(event.preview.scores.readx)}
-                                  </span>
-                                )}
-                              </>
-                            )}
+                          {/* Sector */}
+                          {event.company.gicsSector && (
+                            <span className="text-xs font-medium text-muted-foreground/60 shrink-0 truncate max-w-[140px]" title={event.company.gicsSector}>
+                              · {event.company.gicsSector}
+                            </span>
+                          )}
 
-                            {event.company.marketCapMillion !== null && (
-                              <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary border border-primary/20 shrink-0">
-                                {formatMarketCap(event.company.marketCapMillion)}
-                              </span>
+                          {/* Country */}
+                          {event.company.country && (
+                            <span className="text-xs font-medium text-muted-foreground/60 shrink-0 truncate max-w-[100px]" title={event.company.country}>
+                              · {event.company.country}
+                            </span>
+                          )}
+
+                          {/* Market Cap - subtle text style */}
+                          {event.company.marketCapMillion !== null && (
+                            <span className="text-xs font-medium text-muted-foreground/60 shrink-0">
+                              · {formatMarketCap(event.company.marketCapMillion)}
+                            </span>
+                          )}
+
+                          {/* AI-Forecast - right-aligned before action button */}
+                          <div className="flex items-center gap-3 ml-auto">
+                            {event.preview?.scores && (
+                              <div className="flex items-center gap-3 text-xs">
+                                <span className="text-muted-foreground font-semibold uppercase tracking-wider shrink-0">AI-Forecast:</span>
+                                <div className="flex items-center gap-3">
+                                  {event.preview.scores.overall !== null && (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-muted-foreground/80">Overall</span>
+                                      <span className={`font-bold ${getScoreColor(event.preview.scores.overall).text}`}>
+                                        {formatScore(event.preview.scores.overall)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {event.preview.scores.news !== null && (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-muted-foreground/80">News</span>
+                                      <span className={`font-bold ${getScoreColor(event.preview.scores.news).text}`}>
+                                        {formatScore(event.preview.scores.news)}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {event.preview.scores.readx !== null && (
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-muted-foreground/80">ReadX</span>
+                                      <span className={`font-bold ${getScoreColor(event.preview.scores.readx).text}`}>
+                                        {formatScore(event.preview.scores.readx)}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
                             )}
 
                             {/* Action Button */}
@@ -541,18 +618,18 @@ export function CalendarView({ events }: Props) {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
-                                View Preview
+                                View AI Preview
                               </a>
                             ) : (
-                              <a
-                                href={`mailto:hello@primerapp.com?subject=Request Earnings Preview for ${event.company.ticker ?? event.company.friendlyName ?? event.company.isin}&body=Hi, I would like to request an earnings preview for ${event.company.friendlyName ?? event.company.name} (${event.company.ticker ?? event.company.isin}) scheduled for ${formatDisplayDate(event.date)}.`}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:bg-background hover:border-primary/50 hover:text-foreground shrink-0"
+                              <button
+                                onClick={() => openRequestModal(event)}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:bg-background hover:border-primary/50 hover:text-foreground shrink-0 cursor-pointer"
                               >
                                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                 </svg>
                                 Request Preview
-                              </a>
+                              </button>
                             )}
                           </div>
                         </div>
@@ -564,6 +641,82 @@ export function CalendarView({ events }: Props) {
               </section>
             );
           })}
+        </div>
+      )}
+
+      {/* Request Preview Modal */}
+      {requestModal.isOpen && requestModal.event && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={closeRequestModal}>
+          <div className="bg-card border border-border rounded-lg shadow-2xl max-w-md w-full p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Request AI Preview</h3>
+                <p className="text-sm text-muted-foreground mt-1">We'll email you the earnings preview</p>
+              </div>
+              <button
+                onClick={closeRequestModal}
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="bg-background rounded-lg border border-border p-4 mb-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  {requestModal.event.company.ticker && (
+                    <span className="inline-flex items-center rounded-md bg-violet/15 px-2 py-0.5 text-xs font-mono font-bold text-violet-400 border border-violet-500/30">
+                      {requestModal.event.company.ticker}
+                    </span>
+                  )}
+                  <span className="text-sm font-semibold text-foreground">
+                    {requestModal.event.company.friendlyName ?? requestModal.event.company.name}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Earnings Date: {formatDisplayDate(requestModal.event.date)}
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSubmitRequest} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-semibold text-foreground mb-2">
+                  Your Email Address
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  required
+                  placeholder="you@example.com"
+                  className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={closeRequestModal}
+                  className="flex-1 rounded-lg border border-border bg-card px-4 py-2 text-sm font-semibold text-foreground transition-all hover:bg-background"
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isSubmitting || !email}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Request'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
