@@ -16,15 +16,28 @@ export default async function Home() {
   });
 
   return (
-    <div className="space-y-8">
-      <header className="space-y-4">
-        <h1 className="text-5xl font-bold text-slate-900 tracking-tight">
-          Earnings Calendar
-        </h1>
-        <p className="max-w-3xl text-lg text-slate-600 leading-relaxed">
-          Track upcoming earnings events from Primer Reports. Filter by sector, industry, country, or market cap.
-          View available earnings previews or request new ones.
-        </p>
+    <div className="space-y-6">
+      <header className="pb-4 border-b border-border/50">
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold text-foreground tracking-tight">
+              AI Earnings Calendar
+            </h1>
+            <p className="text-base text-primary font-semibold">
+              World's first AI-powered earnings calendar
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            <div className="inline-flex items-center gap-1.5 text-foreground">
+              <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+              <span className="font-medium">AI-estimated dates</span>
+            </div>
+            <div className="inline-flex items-center gap-1.5 text-foreground">
+              <div className="h-1.5 w-1.5 rounded-full bg-primary" />
+              <span className="font-medium">Real-time previews</span>
+            </div>
+          </div>
+        </div>
       </header>
 
       <CalendarView events={events} />

@@ -14,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Primer Reports Earnings Calendar",
+  title: "AI Earnings Calendar | Primer",
   description:
-    "Upcoming earnings events and preview reports from Primer Reports. Track the next 30 days of earnings with advanced filtering.",
+    "AI-powered earnings calendar with estimated dates and instant preview access. Track upcoming earnings events before they happen.",
 };
 
 export default function RootLayout({
@@ -27,55 +27,64 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-slate-50 antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <div className="min-h-screen">
-          <header className="border-b border-slate-200 bg-white">
+        <div className="min-h-screen bg-background">
+          <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
             <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
               <Link href="/" className="flex items-center gap-3 group">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-600 transition group-hover:bg-violet-700">
-                  <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                <div className="relative flex h-11 w-11 items-center justify-center rounded-lg bg-primary transition-all group-hover:scale-105 group-hover:shadow-lg group-hover:shadow-primary/25">
+                  <svg className="h-6 w-6 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                   </svg>
+                  <div className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full bg-primary border-2 border-background animate-pulse" />
                 </div>
                 <div className="flex flex-col">
-                  <span className="text-lg font-bold text-slate-900">
-                    Earnings Calendar
+                  <span className="text-lg font-semibold text-foreground tracking-tight">
+                    AI Earnings Calendar
                   </span>
-                  <span className="text-xs text-slate-500">by Primer Reports</span>
+                  <span className="text-xs text-muted-foreground font-medium">powered by Primer</span>
                 </div>
               </Link>
               <a
                 href="https://primerapp.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm font-medium text-slate-600 hover:text-violet-600 transition"
+                className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
               >
-                Learn more about Primer →
+                About Primer
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                </svg>
               </a>
             </div>
           </header>
           <main className="mx-auto max-w-7xl px-6 py-12">{children}</main>
-          <footer className="border-t border-slate-200 bg-white mt-20">
-            <div className="mx-auto max-w-7xl px-6 py-8">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                <p className="text-sm text-slate-600">
-                  © {new Date().getFullYear()} Primer Reports. All rights reserved.
-                </p>
-                <div className="flex gap-6">
+          <footer className="border-t border-border bg-card/30 mt-20">
+            <div className="mx-auto max-w-7xl px-6 py-10">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                <div className="flex flex-col items-center sm:items-start gap-2">
+                  <p className="text-sm text-muted-foreground">
+                    © {new Date().getFullYear()} Primer. All rights reserved.
+                  </p>
+                  <p className="text-xs text-muted-foreground/60">
+                    Turn earnings prep into a competitive advantage
+                  </p>
+                </div>
+                <div className="flex gap-8">
                   <a
                     href="mailto:hello@primerapp.com"
-                    className="text-sm text-slate-600 hover:text-violet-600 transition"
+                    className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
                   >
-                    Contact
+                    Get in touch
                   </a>
                   <a
                     href="https://primerapp.com"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-sm text-slate-600 hover:text-violet-600 transition"
+                    className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
                   >
-                    Website
+                    primerapp.com
                   </a>
                 </div>
               </div>

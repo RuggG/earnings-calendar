@@ -17,7 +17,12 @@ type Filters = {
   country: string;
   minMarketCap: string;
   days: number;
+  minOverallScore: string;
+  minNewsScore: string;
+  minReadxScore: string;
 };
+
+type CollapsedDays = Record<string, boolean>;
 
 const formatDisplayDate = (isoDate: string) => {
   const parsed = parseISO(isoDate);
@@ -35,6 +40,22 @@ const formatMarketCap = (marketCapM: number | null) => {
   return `$${marketCapM.toFixed(0)}M`;
 };
 
+// Color code scores from -5 to +5
+const getScoreColor = (score: number | null) => {
+  if (score === null) return { bg: 'bg-muted', text: 'text-muted-foreground', border: 'border-border' };
+
+  if (score >= 3) return { bg: 'bg-emerald-500/20', text: 'text-emerald-400', border: 'border-emerald-500/30' };
+  if (score >= 1) return { bg: 'bg-green-500/20', text: 'text-green-400', border: 'border-green-500/30' };
+  if (score > -1) return { bg: 'bg-muted/50', text: 'text-muted-foreground', border: 'border-border' };
+  if (score > -3) return { bg: 'bg-orange-500/20', text: 'text-orange-400', border: 'border-orange-500/30' };
+  return { bg: 'bg-red-500/20', text: 'text-red-400', border: 'border-red-500/30' };
+};
+
+const formatScore = (score: number | null) => {
+  if (score === null) return 'N/A';
+  return score > 0 ? `+${score.toFixed(1)}` : score.toFixed(1);
+};
+
 export function CalendarView({ events }: Props) {
   const [filters, setFilters] = useState<Filters>({
     search: "",
@@ -43,8 +64,12 @@ export function CalendarView({ events }: Props) {
     country: "",
     minMarketCap: "",
     days: 30,
+    minOverallScore: "",
+    minNewsScore: "",
+    minReadxScore: "",
   });
   const [showFilters, setShowFilters] = useState(false);
+  const [collapsedDays, setCollapsedDays] = useState<CollapsedDays>({});
 
   // Extract unique values for dropdowns
   const filterOptions = useMemo(() => {
@@ -119,14 +144,50 @@ export function CalendarView({ events }: Props) {
     });
   }, [events, filters]);
 
+  const filteredByScores = useMemo(() => {
+    return filteredEvents.filter((event) => {
+      // Score filters only apply to events with previews and scores
+      if (!event.preview?.scores) {
+        // If no scores, include the event (don't filter out)
+        return true;
+      }
+
+      // Overall score filter
+      if (filters.minOverallScore) {
+        const minScore = parseFloat(filters.minOverallScore);
+        if (event.preview.scores.overall === null || event.preview.scores.overall < minScore) {
+          return false;
+        }
+      }
+
+      // News score filter
+      if (filters.minNewsScore) {
+        const minScore = parseFloat(filters.minNewsScore);
+        if (event.preview.scores.news === null || event.preview.scores.news < minScore) {
+          return false;
+        }
+      }
+
+      // ReadX score filter
+      if (filters.minReadxScore) {
+        const minScore = parseFloat(filters.minReadxScore);
+        if (event.preview.scores.readx === null || event.preview.scores.readx < minScore) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [filteredEvents, filters]);
+
   const grouped = useMemo(() => {
-    return filteredEvents.reduce<GroupedEvents>((acc, event) => {
+    return filteredByScores.reduce<GroupedEvents>((acc, event) => {
       const bucket = event.date;
       acc[bucket] = acc[bucket] ?? [];
       acc[bucket].push(event);
       return acc;
     }, {});
-  }, [filteredEvents]);
+  }, [filteredByScores]);
 
   const sortedDates = useMemo(() => {
     return Object.keys(grouped).sort(
@@ -140,6 +201,9 @@ export function CalendarView({ events }: Props) {
     if (filters.industry) count++;
     if (filters.country) count++;
     if (filters.minMarketCap) count++;
+    if (filters.minOverallScore) count++;
+    if (filters.minNewsScore) count++;
+    if (filters.minReadxScore) count++;
     return count;
   }, [filters]);
 
@@ -151,74 +215,86 @@ export function CalendarView({ events }: Props) {
       country: "",
       minMarketCap: "",
       days: 30,
+      minOverallScore: "",
+      minNewsScore: "",
+      minReadxScore: "",
     });
   };
 
-  return (
-    <div className="space-y-6">
-      {/* Days Toggle */}
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-slate-700">Show:</span>
-        {[7, 14, 30].map((days) => (
-          <button
-            key={days}
-            onClick={() => setFilters({ ...filters, days })}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
-              filters.days === days
-                ? "bg-violet-600 text-white shadow-sm"
-                : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
-            }`}
-          >
-            {days} days
-          </button>
-        ))}
-      </div>
+  const toggleDay = (date: string) => {
+    setCollapsedDays(prev => ({
+      ...prev,
+      [date]: !prev[date]
+    }));
+  };
 
+  return (
+    <div className="space-y-4">
       {/* Search and Filter Controls */}
-      <div className="space-y-4">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="relative flex-1 max-w-2xl">
             <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4">
-              <svg className="h-5 w-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
             </div>
             <input
               type="search"
               placeholder="Search by ticker, company name, or ISIN..."
-              className="w-full rounded-lg border border-slate-200 bg-white pl-11 pr-4 py-3 text-slate-900 shadow-sm transition focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200"
+              className="w-full rounded-lg border border-border bg-card pl-11 pr-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
             />
           </div>
 
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 hover:border-slate-300"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
-            Filters
-            {activeFiltersCount > 0 && (
-              <span className="inline-flex items-center justify-center h-5 min-w-5 rounded-full bg-violet-600 px-1.5 text-xs font-semibold text-white">
-                {activeFiltersCount}
-              </span>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Days Toggle - Inline */}
+            <div className="flex items-center gap-1.5 border-r border-border pr-2">
+              {[7, 14, 30].map((days) => (
+                <button
+                  key={days}
+                  onClick={() => setFilters({ ...filters, days })}
+                  className={`px-3 py-2 text-xs font-semibold rounded transition-all ${
+                    filters.days === days
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-card text-muted-foreground hover:text-foreground hover:bg-card/80"
+                  }`}
+                >
+                  {days}d
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="inline-flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs font-semibold text-foreground shadow-sm transition-all hover:bg-card/80 hover:border-primary/50"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              {activeFiltersCount > 0 && (
+                <span className="inline-flex items-center justify-center h-4 min-w-4 rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Filter Panel */}
         {showFilters && (
-          <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-lg border border-border bg-card/50 backdrop-blur-sm p-4 shadow-lg space-y-4">
+            <div>
+              <h3 className="text-xs font-bold text-foreground mb-2 uppercase tracking-wider">Company Filters</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <label htmlFor="sector" className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="sector" className="block text-xs font-semibold text-foreground mb-1.5">
                   Sector
                 </label>
                 <select
                   id="sector"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
                   value={filters.sector}
                   onChange={(e) => setFilters({ ...filters, sector: e.target.value })}
                 >
@@ -232,12 +308,12 @@ export function CalendarView({ events }: Props) {
               </div>
 
               <div>
-                <label htmlFor="industry" className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="industry" className="block text-xs font-semibold text-foreground mb-1.5">
                   Industry
                 </label>
                 <select
                   id="industry"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
                   value={filters.industry}
                   onChange={(e) => setFilters({ ...filters, industry: e.target.value })}
                 >
@@ -251,12 +327,12 @@ export function CalendarView({ events }: Props) {
               </div>
 
               <div>
-                <label htmlFor="country" className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="country" className="block text-xs font-semibold text-foreground mb-1.5">
                   Country
                 </label>
                 <select
                   id="country"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
                   value={filters.country}
                   onChange={(e) => setFilters({ ...filters, country: e.target.value })}
                 >
@@ -270,27 +346,85 @@ export function CalendarView({ events }: Props) {
               </div>
 
               <div>
-                <label htmlFor="marketCap" className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="marketCap" className="block text-xs font-semibold text-foreground mb-1.5">
                   Min Market Cap ($M)
                 </label>
                 <input
                   id="marketCap"
                   type="number"
                   placeholder="e.g. 1000"
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm transition focus:border-violet-400 focus:outline-none focus:ring-2 focus:ring-violet-200"
+                  className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
                   value={filters.minMarketCap}
                   onChange={(e) => setFilters({ ...filters, minMarketCap: e.target.value })}
                 />
               </div>
             </div>
+            </div>
+
+            {/* Score Filters */}
+            <div>
+              <h3 className="text-xs font-bold text-foreground mb-2 uppercase tracking-wider">AI Score Filters</h3>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div>
+                  <label htmlFor="minOverall" className="block text-xs font-semibold text-foreground mb-1.5">
+                    Min Overall Score
+                  </label>
+                  <input
+                    id="minOverall"
+                    type="number"
+                    placeholder="-5 to +5"
+                    step="0.5"
+                    min="-5"
+                    max="5"
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    value={filters.minOverallScore}
+                    onChange={(e) => setFilters({ ...filters, minOverallScore: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="minNews" className="block text-xs font-semibold text-foreground mb-1.5">
+                    Min News Score
+                  </label>
+                  <input
+                    id="minNews"
+                    type="number"
+                    placeholder="-5 to +5"
+                    step="0.5"
+                    min="-5"
+                    max="5"
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    value={filters.minNewsScore}
+                    onChange={(e) => setFilters({ ...filters, minNewsScore: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="minReadx" className="block text-xs font-semibold text-foreground mb-1.5">
+                    Min ReadX Score
+                  </label>
+                  <input
+                    id="minReadx"
+                    type="number"
+                    placeholder="-5 to +5"
+                    step="0.5"
+                    min="-5"
+                    max="5"
+                    className="w-full rounded-lg border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground shadow-sm transition-all focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    value={filters.minReadxScore}
+                    onChange={(e) => setFilters({ ...filters, minReadxScore: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
 
             {activeFiltersCount > 0 && (
-              <div className="mt-4 flex justify-end">
+              <div className="mt-3 flex justify-end">
                 <button
                   onClick={clearFilters}
-                  className="text-sm font-medium text-violet-600 hover:text-violet-700 transition"
+                  className="text-xs font-semibold text-primary hover:text-primary/80 transition-colors"
                 >
-                  Clear all filters
+                  Clear all
                 </button>
               </div>
             )}
@@ -300,69 +434,97 @@ export function CalendarView({ events }: Props) {
 
       {/* Results Summary */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-600">
-          Showing <span className="font-semibold text-slate-900">{filteredEvents.length}</span> of{" "}
-          <span className="font-semibold text-slate-900">{events.length}</span> earnings events
+        <p className="text-xs text-muted-foreground">
+          <span className="font-bold text-primary">{filteredByScores.length}</span> of{" "}
+          <span className="font-semibold text-foreground">{events.length}</span> events
         </p>
       </div>
 
       {/* Calendar Events */}
       {sortedDates.length === 0 ? (
-        <div className="rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 p-12 text-center">
-          <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="rounded-lg border-2 border-dashed border-border bg-card/30 p-8 text-center">
+          <svg className="mx-auto h-10 w-10 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <p className="mt-4 text-sm font-medium text-slate-600">No earnings events found</p>
-          <p className="mt-1 text-sm text-slate-500">Try adjusting your search or filters</p>
+          <p className="mt-3 text-sm font-semibold text-foreground">No earnings events found</p>
+          <p className="mt-1 text-xs text-muted-foreground">Try adjusting your search or filters</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {sortedDates.map((isoDate) => {
             const list = grouped[isoDate];
+            const isCollapsed = collapsedDays[isoDate] || false;
             return (
               <section
                 key={isoDate}
-                className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm"
+                className="overflow-hidden rounded-lg border border-border bg-card shadow-lg shadow-black/5"
               >
-                <header className="border-b border-slate-100 bg-slate-50 px-6 py-4">
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    {formatDisplayDate(isoDate)}
-                  </h2>
-                  <p className="mt-0.5 text-sm text-slate-600">
-                    {list.length} {list.length === 1 ? "company" : "companies"}
-                  </p>
+                <header
+                  className="border-b border-border bg-card/80 backdrop-blur-sm px-4 py-2.5 cursor-pointer hover:bg-card transition-colors select-none"
+                  onClick={() => toggleDay(isoDate)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-base font-semibold text-foreground tracking-tight">
+                        {formatDisplayDate(isoDate)}
+                      </h2>
+                      <p className="mt-0.5 text-xs text-muted-foreground font-medium">
+                        {list.length} {list.length === 1 ? "company" : "companies"}
+                      </p>
+                    </div>
+                    <svg
+                      className={`h-5 w-5 text-muted-foreground transition-transform ${isCollapsed ? '' : 'rotate-180'}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
                 </header>
-                <ul className="divide-y divide-slate-100">
+                {!isCollapsed && (
+                  <ul className="divide-y divide-border/50">
                   {list.map((event) => (
-                    <li key={`${event.id}-${event.company.isin}`} className="transition hover:bg-slate-50">
-                      <div className="px-4 py-3">
+                    <li key={`${event.id}-${event.company.isin}`} className="transition-all hover:bg-card/50">
+                      <div className="px-4 py-2.5">
                         <div className="flex items-center gap-3">
                           {/* Ticker */}
                           {event.company.ticker && (
-                            <span className="inline-flex items-center rounded-md bg-slate-900 px-2.5 py-1 text-xs font-mono font-semibold text-white shrink-0">
+                            <span className="inline-flex items-center rounded-md bg-primary/10 px-2.5 py-1 text-xs font-mono font-bold text-primary border border-primary/20 shrink-0">
                               {event.company.ticker}
                             </span>
                           )}
 
                           {/* Company Name */}
-                          <span className="text-sm font-semibold text-slate-900 truncate">
+                          <span className="text-sm font-semibold text-foreground truncate">
                             {event.company.friendlyName ?? event.company.name ?? "Company name unavailable"}
                           </span>
 
                           {/* Metadata Tags */}
                           <div className="flex flex-wrap items-center gap-2 ml-auto">
-                            {event.company.gicsSector && (
-                              <span className="inline-flex items-center rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 border border-violet-200 shrink-0">
-                                {event.company.gicsSector}
-                              </span>
+                            {/* AI Scores - only show if preview exists and scores are available */}
+                            {event.preview?.scores && (
+                              <>
+                                {event.preview.scores.overall !== null && (
+                                  <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold border shrink-0 ${getScoreColor(event.preview.scores.overall).bg} ${getScoreColor(event.preview.scores.overall).text} ${getScoreColor(event.preview.scores.overall).border}`}>
+                                    <span className="opacity-60">Overall:</span> {formatScore(event.preview.scores.overall)}
+                                  </span>
+                                )}
+                                {event.preview.scores.news !== null && (
+                                  <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold border shrink-0 ${getScoreColor(event.preview.scores.news).bg} ${getScoreColor(event.preview.scores.news).text} ${getScoreColor(event.preview.scores.news).border}`}>
+                                    <span className="opacity-60">News:</span> {formatScore(event.preview.scores.news)}
+                                  </span>
+                                )}
+                                {event.preview.scores.readx !== null && (
+                                  <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold border shrink-0 ${getScoreColor(event.preview.scores.readx).bg} ${getScoreColor(event.preview.scores.readx).text} ${getScoreColor(event.preview.scores.readx).border}`}>
+                                    <span className="opacity-60">ReadX:</span> {formatScore(event.preview.scores.readx)}
+                                  </span>
+                                )}
+                              </>
                             )}
-                            {event.company.country && (
-                              <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200 shrink-0">
-                                {event.company.country}
-                              </span>
-                            )}
+
                             {event.company.marketCapMillion !== null && (
-                              <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200 shrink-0">
+                              <span className="inline-flex items-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary border border-primary/20 shrink-0">
                                 {formatMarketCap(event.company.marketCapMillion)}
                               </span>
                             )}
@@ -373,22 +535,23 @@ export function CalendarView({ events }: Props) {
                                 href={event.preview.storageUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 shrink-0"
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-bold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 hover:shadow-lg hover:shadow-primary/30 shrink-0"
                               >
                                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                 </svg>
-                                View
+                                View Preview
                               </a>
                             ) : (
                               <a
                                 href={`mailto:hello@primerapp.com?subject=Request Earnings Preview for ${event.company.ticker ?? event.company.friendlyName ?? event.company.isin}&body=Hi, I would like to request an earnings preview for ${event.company.friendlyName ?? event.company.name} (${event.company.ticker ?? event.company.isin}) scheduled for ${formatDisplayDate(event.date)}.`}
-                                className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 hover:border-violet-300 shrink-0"
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground transition-all hover:bg-background hover:border-primary/50 hover:text-foreground shrink-0"
                               >
                                 <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                 </svg>
-                                Request
+                                Request Preview
                               </a>
                             )}
                           </div>
@@ -396,7 +559,8 @@ export function CalendarView({ events }: Props) {
                       </div>
                     </li>
                   ))}
-                </ul>
+                  </ul>
+                )}
               </section>
             );
           })}

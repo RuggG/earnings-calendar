@@ -10,6 +10,12 @@ export interface CompanyInfo {
   marketCapMillion: number | null;
 }
 
+export interface ReportScores {
+  overall: number | null;
+  news: number | null;
+  readx: number | null;
+}
+
 export interface EarningsEvent {
   id: number;
   date: string;
@@ -20,5 +26,6 @@ export interface EarningsEvent {
     name: string;
     storageUrl: string;
     generatedAt: string;
+    scores?: ReportScores;
   };
 }

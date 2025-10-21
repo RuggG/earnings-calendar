@@ -18,6 +18,9 @@ type EarningsRow = {
   preview_name: string | null;
   preview_storage_url: string | null;
   preview_generated_at: string | null;
+  score_overall: number | null;
+  score_news: number | null;
+  score_readx: number | null;
 };
 
 function mapRow(row: EarningsRow): EarningsEvent {
@@ -46,6 +49,15 @@ function mapRow(row: EarningsRow): EarningsEvent {
       storageUrl: row.preview_storage_url,
       generatedAt: row.preview_generated_at ?? "",
     };
+
+    // Add scores if available
+    if (row.score_overall !== null || row.score_news !== null || row.score_readx !== null) {
+      event.preview.scores = {
+        overall: row.score_overall,
+        news: row.score_news,
+        readx: row.score_readx,
+      };
+    }
   }
 
   return event;
@@ -89,10 +101,16 @@ export async function fetchEarningsCalendar(params: {
         lp.id AS preview_id,
         lp.name AS preview_name,
         lp.storage_url AS preview_storage_url,
-        lp.generated_at::text AS preview_generated_at
+        lp.generated_at::text AS preview_generated_at,
+        rs_overall.value AS score_overall,
+        rs_news.value AS score_news,
+        rs_readx.value AS score_readx
       FROM librarian.earnings_calendar ec
       LEFT JOIN public.company c ON c.isin = ec.isin
       LEFT JOIN latest_previews lp ON lp.isin = ec.isin
+      LEFT JOIN public.report_scores rs_overall ON rs_overall.report_id = lp.id AND rs_overall.name = 'overall'
+      LEFT JOIN public.report_scores rs_news ON rs_news.report_id = lp.id AND rs_news.name = 'news'
+      LEFT JOIN public.report_scores rs_readx ON rs_readx.report_id = lp.id AND rs_readx.name = 'readx'
       WHERE ec.date BETWEEN $1::date AND $2::date
       ORDER BY ec.date ASC, c.ticker NULLS LAST, c.friendly_name NULLS LAST;
     `,
