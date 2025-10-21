@@ -16,6 +16,7 @@ type Filters = {
   industry: string;
   country: string;
   minMarketCap: string;
+  days: number;
 };
 
 const formatDisplayDate = (isoDate: string) => {
@@ -41,6 +42,7 @@ export function CalendarView({ events }: Props) {
     industry: "",
     country: "",
     minMarketCap: "",
+    days: 30,
   });
   const [showFilters, setShowFilters] = useState(false);
 
@@ -64,7 +66,18 @@ export function CalendarView({ events }: Props) {
   }, [events]);
 
   const filteredEvents = useMemo(() => {
-    return events.filter(({ company }) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const maxDate = new Date(today);
+    maxDate.setDate(maxDate.getDate() + filters.days);
+
+    return events.filter(({ company, date }) => {
+      // Days filter
+      const eventDate = parseISO(date);
+      if (eventDate > maxDate) {
+        return false;
+      }
+
       // Search filter
       if (filters.search.trim()) {
         const term = filters.search.toLowerCase();
@@ -137,11 +150,30 @@ export function CalendarView({ events }: Props) {
       industry: "",
       country: "",
       minMarketCap: "",
+      days: 30,
     });
   };
 
   return (
     <div className="space-y-6">
+      {/* Days Toggle */}
+      <div className="flex items-center gap-2">
+        <span className="text-sm font-medium text-slate-700">Show:</span>
+        {[7, 14, 30].map((days) => (
+          <button
+            key={days}
+            onClick={() => setFilters({ ...filters, days })}
+            className={`px-4 py-2 text-sm font-medium rounded-lg transition ${
+              filters.days === days
+                ? "bg-violet-600 text-white shadow-sm"
+                : "bg-white text-slate-700 border border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            {days} days
+          </button>
+        ))}
+      </div>
+
       {/* Search and Filter Controls */}
       <div className="space-y-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -303,79 +335,60 @@ export function CalendarView({ events }: Props) {
                 <ul className="divide-y divide-slate-100">
                   {list.map((event) => (
                     <li key={`${event.id}-${event.company.isin}`} className="transition hover:bg-slate-50">
-                      <div className="px-6 py-5">
-                        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                          {/* Company Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-4">
-                              <h3 className="text-base font-semibold text-slate-900">
-                                {event.company.friendlyName ?? event.company.name ?? "Company name unavailable"}
-                              </h3>
-                            </div>
+                      <div className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {/* Ticker */}
+                          {event.company.ticker && (
+                            <span className="inline-flex items-center rounded-md bg-slate-900 px-2.5 py-1 text-xs font-mono font-semibold text-white shrink-0">
+                              {event.company.ticker}
+                            </span>
+                          )}
 
-                            {/* Metadata Tags */}
-                            <div className="mt-3 flex flex-wrap gap-2">
-                              {event.company.ticker && (
-                                <span className="inline-flex items-center rounded-md bg-slate-900 px-2.5 py-1 text-xs font-mono font-semibold text-white">
-                                  {event.company.ticker}
-                                </span>
-                              )}
-                              {event.company.gicsSector && (
-                                <span className="inline-flex items-center rounded-md bg-violet-50 px-2.5 py-1 text-xs font-medium text-violet-700 border border-violet-200">
-                                  {event.company.gicsSector}
-                                </span>
-                              )}
-                              {event.company.country && (
-                                <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 border border-blue-200">
-                                  {event.company.country}
-                                </span>
-                              )}
-                              {event.company.marketCapMillion !== null && (
-                                <span className="inline-flex items-center rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700 border border-emerald-200">
-                                  {formatMarketCap(event.company.marketCapMillion)}
-                                </span>
-                              )}
-                              <span className="inline-flex items-center rounded-md bg-slate-50 px-2.5 py-1 text-xs font-mono text-slate-500 border border-slate-200">
-                                {event.company.isin}
+                          {/* Company Name */}
+                          <span className="text-sm font-semibold text-slate-900 truncate">
+                            {event.company.friendlyName ?? event.company.name ?? "Company name unavailable"}
+                          </span>
+
+                          {/* Metadata Tags */}
+                          <div className="flex flex-wrap items-center gap-2 ml-auto">
+                            {event.company.gicsSector && (
+                              <span className="inline-flex items-center rounded-md bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-700 border border-violet-200 shrink-0">
+                                {event.company.gicsSector}
                               </span>
-                            </div>
-
-                            {/* Additional Info */}
-                            {(event.company.gicsIndustry || event.company.yearEnd) && (
-                              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
-                                {event.company.gicsIndustry && (
-                                  <span>Industry: {event.company.gicsIndustry}</span>
-                                )}
-                                {event.company.yearEnd && (
-                                  <span>Year End: {event.company.yearEnd}</span>
-                                )}
-                              </div>
                             )}
-                          </div>
+                            {event.company.country && (
+                              <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-200 shrink-0">
+                                {event.company.country}
+                              </span>
+                            )}
+                            {event.company.marketCapMillion !== null && (
+                              <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 border border-emerald-200 shrink-0">
+                                {formatMarketCap(event.company.marketCapMillion)}
+                              </span>
+                            )}
 
-                          {/* Action Button */}
-                          <div className="flex-shrink-0">
+                            {/* Action Button */}
                             {event.preview ? (
                               <a
                                 href={event.preview.storageUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 hover:shadow-md"
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-violet-700 shrink-0"
                               >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
                                 </svg>
-                                View Preview
+                                View
                               </a>
                             ) : (
                               <a
                                 href={`mailto:hello@primerapp.com?subject=Request Earnings Preview for ${event.company.ticker ?? event.company.friendlyName ?? event.company.isin}&body=Hi, I would like to request an earnings preview for ${event.company.friendlyName ?? event.company.name} (${event.company.ticker ?? event.company.isin}) scheduled for ${formatDisplayDate(event.date)}.`}
-                                className="inline-flex items-center gap-2 rounded-lg border-2 border-violet-200 bg-white px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 hover:border-violet-300"
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 transition hover:bg-violet-50 hover:border-violet-300 shrink-0"
                               >
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                                 </svg>
-                                Ask for Preview
+                                Request
                               </a>
                             )}
                           </div>
