@@ -1,97 +1,141 @@
-import { supabase } from './supabase';
-import { Company, Report, EarningsEventWithDetails, EarningsCalendarDay } from './types';
-import { getNextBusinessDays, formatDateForDB } from './businessDays';
+import { dbQuery } from "./db";
+import type { EarningsEvent, EarningsPreview } from "./types";
 
-/**
- * Fetch earnings events for the next N business days
- */
-export async function getEarningsCalendar(days: number = 5): Promise<EarningsCalendarDay[]> {
-  const businessDays = getNextBusinessDays(days);
-  const startDate = formatDateForDB(businessDays[0]);
-  const endDate = formatDateForDB(businessDays[businessDays.length - 1]);
+type EarningsRow = {
+  id: number;
+  date: string;
+  source: string | null;
+  isin: string;
+  company_name: string | null;
+  company_friendly_name: string | null;
+  company_ticker: string | null;
+  company_gics_sector: string | null;
+  company_gics_industry: string | null;
+  company_country: string | null;
+};
 
-  // Fetch earnings events
-  const { data: events, error: eventsError } = await supabase
-    .schema('librarian')
-    .from('earnings_calendar')
-    .select('*')
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .order('date', { ascending: true });
+type EarningsPreviewRow = EarningsRow & {
+  preview_id: string | null;
+  preview_name: string | null;
+  preview_storage_url: string | null;
+  preview_generated_at: string | null;
+};
 
-  if (eventsError) {
-    console.error('Error fetching earnings events:', eventsError);
-    throw eventsError;
-  }
+function mapRow(row: EarningsRow): EarningsEvent {
+  return {
+    id: row.id,
+    date: row.date,
+    source: row.source,
+    company: {
+      isin: row.isin,
+      name: row.company_name,
+      friendlyName: row.company_friendly_name,
+      ticker: row.company_ticker,
+      gicsSector: row.company_gics_sector,
+      gicsIndustry: row.company_gics_industry,
+      country: row.company_country,
+    },
+  };
+}
 
-  if (!events || events.length === 0) {
-    return businessDays.map(date => ({
-      date,
-      dateString: formatDateForDB(date),
-      events: []
-    }));
-  }
-
-  // Get unique ISINs
-  const isins = [...new Set(events.map((e) => (e as { isin: string }).isin).filter(Boolean))];
-
-  // Fetch company details
-  const { data: companies, error: companiesError } = await supabase
-    .from('company')
-    .select('*')
-    .in('isin', isins);
-
-  if (companiesError) {
-    console.error('Error fetching companies:', companiesError);
-  }
-
-  // Fetch earnings preview reports
-  const { data: reports, error: reportsError } = await supabase
-    .from('reports')
-    .select('*')
-    .in('isin', isins);
-
-  if (reportsError) {
-    console.error('Error fetching reports:', reportsError);
-  }
-
-  // Create lookup maps
-  const companyMap = new Map<string, Company>();
-  companies?.forEach((company) => {
-    companyMap.set((company as Company).isin, company as Company);
-  });
-
-  const reportMap = new Map<string, Report>();
-  reports?.forEach((report) => {
-    const typedReport = report as Report;
-    // Store the most recent report for each ISIN
-    if (!reportMap.has(typedReport.isin) ||
-        new Date(typedReport.created_at) > new Date(reportMap.get(typedReport.isin)!.created_at)) {
-      reportMap.set(typedReport.isin, typedReport);
-    }
-  });
-
-  // Combine events with company and report data
-  const eventsWithDetails: EarningsEventWithDetails[] = events.map((event) => {
-    const typedEvent = event as { id: number; isin: string; date: string; time?: string };
+function mapPreviewRow(row: EarningsPreviewRow): EarningsPreview {
+  const base = mapRow(row);
+  if (row.preview_id && row.preview_storage_url) {
     return {
-      ...typedEvent,
-      company: companyMap.get(typedEvent.isin) || { isin: typedEvent.isin, name: 'Unknown Company' },
-      report: reportMap.get(typedEvent.isin)
+      ...base,
+      preview: {
+        reportId: row.preview_id,
+        name: row.preview_name ?? "Earnings Preview",
+        storageUrl: row.preview_storage_url,
+        generatedAt: row.preview_generated_at ?? "",
+      },
     };
-  });
+  }
+  return base;
+}
 
-  // Group events by date
-  const calendar: EarningsCalendarDay[] = businessDays.map(date => {
-    const dateString = formatDateForDB(date);
-    const dayEvents = eventsWithDetails.filter(e => e.date === dateString);
+export async function fetchEarningsCalendar(params: {
+  startDate: string;
+  endDate: string;
+}): Promise<EarningsEvent[]> {
+  const { startDate, endDate } = params;
 
-    return {
-      date,
-      dateString,
-      events: dayEvents
-    };
-  });
+  const { rows } = await dbQuery<EarningsRow>(
+    `
+      SELECT
+        ec.id,
+        ec.date::text AS date,
+        ec.source,
+        ec.isin,
+        c.name AS company_name,
+        c.friendly_name AS company_friendly_name,
+        c.ticker AS company_ticker,
+        c.gics_sector AS company_gics_sector,
+        c.gics_industry AS company_gics_industry,
+        c.country AS company_country
+      FROM librarian.earnings_calendar ec
+      LEFT JOIN public.company c ON c.isin = ec.isin
+      WHERE ec.date BETWEEN $1::date AND $2::date
+      ORDER BY ec.date ASC, c.ticker NULLS LAST, c.name NULLS LAST;
+    `,
+    [startDate, endDate]
+  );
 
-  return calendar;
+  return rows.map(mapRow);
+}
+
+export async function fetchPreviewsForDates(params: {
+  isoDates: string[];
+}): Promise<EarningsPreview[]> {
+  const { isoDates } = params;
+
+  if (isoDates.length === 0) {
+    return [];
+  }
+
+  const { rows } = await dbQuery<EarningsPreviewRow>(
+    `
+      WITH events AS (
+        SELECT
+          ec.id,
+          ec.date::text AS date,
+          ec.source,
+          ec.isin,
+          c.name AS company_name,
+          c.friendly_name AS company_friendly_name,
+          c.ticker AS company_ticker,
+          c.gics_sector AS company_gics_sector,
+          c.gics_industry AS company_gics_industry,
+          c.country AS company_country
+        FROM librarian.earnings_calendar ec
+        LEFT JOIN public.company c ON c.isin = ec.isin
+        WHERE ec.date = ANY ($1::date[])
+      ),
+      latest_previews AS (
+        SELECT DISTINCT ON (r.isin)
+          r.isin,
+          r.id,
+          r.name,
+          r.storage_url,
+          r.generated_at
+        FROM public.reports r
+        WHERE r.report_type_id = 6
+          AND r.isin IS NOT NULL
+          AND r.storage_url IS NOT NULL
+        ORDER BY r.isin, r.generated_at DESC
+      )
+      SELECT
+        e.*,
+        lp.id AS preview_id,
+        lp.name AS preview_name,
+        lp.storage_url AS preview_storage_url,
+        lp.generated_at::text AS preview_generated_at
+      FROM events e
+      LEFT JOIN latest_previews lp ON lp.isin = e.isin
+      ORDER BY e.date ASC, e.company_ticker NULLS LAST, e.company_name NULLS LAST;
+    `,
+    [isoDates]
+  );
+
+  return rows.map(mapPreviewRow);
 }

@@ -1,82 +1,64 @@
-# Earnings Calendar
+# Primer Reports Earnings Calendar
 
-A Next.js web application that displays earnings reports for the next 5 business days with links to earnings preview reports.
+Public Next.js site that surfaces upcoming earnings events from the Primer Reports warehouse and links straight to preview reports when they exist. The home page shows a 30-day calendar of events; the "Next 5 Business Days" view focuses on the immediate pipeline and surfaces preview links from Primer storage.
 
 ## Features
+- Calendar view grouped by event date with quick search across tickers, names, and ISINs
+- Next five business days spotlight with direct links to published preview reports
+- Server-rendered data fetched directly from Supabase Postgres via `pg`
+- Lightweight Tailwind styling, revalidated every 60 seconds
 
-- Displays earnings calendar for the next 5 business days (excluding weekends)
-- Shows company information including name, ticker, country, and ISIN
-- Direct links to earnings preview reports (when available)
-- Responsive design with dark mode support
-- Server-side rendering for fast performance
+## Prerequisites
+- Node.js 20+
+- Access to the PrimerReports Supabase project (credentials are pulled from the shared keychain loader)
 
-## Tech Stack
+## Local Development
+1. `cd ~/repos/earnings-calendar`
+2. Install dependencies: `npm install`
+3. Load credentials: `source ~/Documents/dev/credentials-keychain.sh`
+4. Create `.env.local` and set the Postgres connection string. Either copy `.env.example` or run the helper script:
+   ```bash
+   ./scripts/print-database-url.sh > .env.local
+   ```
+   The script prints the Supabase Postgres URL using `SUPABASE_PROJECT_ID` and `SUPABASE_DB_PASSWORD` from the keychain. If you prefer to edit manually, ensure `DATABASE_URL` includes `sslmode=require`.
+5. Start the app: `npm run dev`
+6. Visit http://localhost:3000 for the calendar and http://localhost:3000/previews for the preview dashboard.
 
-- **Framework**: Next.js 15 with App Router
-- **Database**: Supabase (PrimerReports DB)
-- **Styling**: Tailwind CSS
-- **Language**: TypeScript
-- **Date Utilities**: date-fns
+## Testing & Linting
+- `npm run lint` – Next.js/ESLint checks
+- `npm run test` – Vitest unit tests (currently covers business-day calculations)
 
-## Database Schema
+## Data Access
+Queries live in `src/lib/queries.ts` and are executed server-side only. They join:
+- `librarian.earnings_calendar` for schedule metadata
+- `public.company` for ticker, friendly name, and sector info
+- `public.reports` filtered to `report_type_id = 6` (earnings previews) for storage links
 
-The application uses three main tables:
-
-1. `librarian.earnings_calendar` - earnings event data
-2. `public.company` - company details (linked via ISIN)
-3. `public.reports` - earnings preview reports with storage URLs
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ installed
-- Access to Supabase PrimerReports database
-
-### Installation
-
-1. Clone the repository
-2. Install dependencies:
-
-```bash
-npm install
-```
-
-3. Create a `.env.local` file with your Supabase credentials:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://rgibsterkohbrorzzflu.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-4. Run the development server:
-
-```bash
-npm run dev
-```
-
-5. Open [http://localhost:3000](http://localhost:3000) to view the application
-
-## Deployment on Render
-
-This application is configured for deployment on Render using the included `render.yaml` file.
-
-### Deploy Steps:
-
-1. Push code to a Git repository (GitHub, GitLab, etc.)
-2. Create a new Web Service on Render
-3. Connect your repository
-4. Render will automatically detect the `render.yaml` configuration
-5. Add the `SUPABASE_SERVICE_ROLE_KEY` environment variable in Render dashboard
-6. Deploy!
-
-Alternatively, use the deployment tools in `~/repos/deployment-tools/` for automated deployment.
+The Next.js pages run with `revalidate = 60`, so fresh data is pulled roughly once a minute in production. No secrets are ever sent to the client – only pre-rendered JSON.
 
 ## Environment Variables
+- `DATABASE_URL` – Supabase Postgres connection string with `sslmode=require`
 
-- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
-- `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key for server-side queries
+See `.env.example` for the required key. Render deployment will also need the same variable configured. The helper script never persists secrets; it only echoes the computed URL so you can pipe it into `.env.local` or your deployment workflow.
 
-## License
+## Project Layout
+```
+src/
+  app/
+    page.tsx              # 30-day calendar view
+    previews/page.tsx     # Next 5 business days with preview links
+    layout.tsx            # Shared shell + navigation
+  components/
+    CalendarView.tsx
+    PreviewsView.tsx
+  lib/
+    businessDays.ts
+    db.ts
+    queries.ts
+    types.ts
+scripts/
+  print-database-url.sh   # Helper to echo DATABASE_URL from keychain secrets
+```
 
-MIT
+## Deployment
+Use the shared deployment workflow in `~/repos/deployment-tools/` when you're ready to push to Render. Pull the latest tooling (`git -C ~/repos/deployment-tools pull`) and follow the repo's README to prepare a Render service with `DATABASE_URL` set. A deploy-ready configuration file is added in the next step of this task list.

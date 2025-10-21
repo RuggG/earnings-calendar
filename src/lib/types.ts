@@ -1,34 +1,25 @@
-export interface Company {
+export interface CompanyInfo {
   isin: string;
-  name: string;
-  ticker?: string;
-  country?: string;
+  name: string | null;
+  ticker: string | null;
+  friendlyName: string | null;
+  gicsSector: string | null;
+  gicsIndustry: string | null;
+  country: string | null;
 }
 
 export interface EarningsEvent {
   id: number;
-  isin: string;
   date: string;
-  time?: string;
-  company?: Company;
+  source: string | null;
+  company: CompanyInfo;
 }
 
-export interface Report {
-  id: number;
-  isin: string;
-  report_type: string;
-  storage_url: string;
-  created_at: string;
-  title?: string;
-}
-
-export interface EarningsCalendarDay {
-  date: Date;
-  dateString: string;
-  events: EarningsEventWithDetails[];
-}
-
-export interface EarningsEventWithDetails extends EarningsEvent {
-  company: Company;
-  report?: Report;
+export interface EarningsPreview extends EarningsEvent {
+  preview?: {
+    reportId: string;
+    name: string;
+    storageUrl: string;
+    generatedAt: string;
+  };
 }
