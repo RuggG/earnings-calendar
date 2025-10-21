@@ -651,7 +651,7 @@ Thank you!`;
             <div className="flex items-start justify-between mb-4">
               <div>
                 <h3 className="text-lg font-semibold text-foreground">Request AI Preview</h3>
-                <p className="text-sm text-muted-foreground mt-1">We'll email you the earnings preview</p>
+                <p className="text-sm text-muted-foreground mt-1">We&apos;ll email you the earnings preview</p>
               </div>
               <button
                 onClick={closeRequestModal}
