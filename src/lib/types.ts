@@ -6,6 +6,8 @@ export interface CompanyInfo {
   gicsSector: string | null;
   gicsIndustry: string | null;
   country: string | null;
+  yearEnd: string | null;
+  marketCapMillion: number | null;
 }
 
 export interface EarningsEvent {
@@ -13,9 +15,6 @@ export interface EarningsEvent {
   date: string;
   source: string | null;
   company: CompanyInfo;
-}
-
-export interface EarningsPreview extends EarningsEvent {
   preview?: {
     reportId: string;
     name: string;

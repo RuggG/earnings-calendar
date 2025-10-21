@@ -1,12 +1,15 @@
 # Primer Reports Earnings Calendar
 
-Public Next.js site that surfaces upcoming earnings events from the Primer Reports warehouse and links straight to preview reports when they exist. The home page shows a 30-day calendar of events; the "Next 5 Business Days" view focuses on the immediate pipeline and surfaces preview links from Primer storage.
+Public Next.js site that surfaces upcoming earnings events from the Primer Reports warehouse and links directly to preview reports when they exist. The application displays a 30-day calendar with comprehensive filtering and preview access.
 
 ## Features
-- Calendar view grouped by event date with quick search across tickers, names, and ISINs
-- Next five business days spotlight with direct links to published preview reports
+- 30-day calendar view with earnings events grouped by date
+- Advanced filtering by sector, industry, country, and market cap
+- Direct links to earnings preview reports (generated within last 2 weeks)
+- "Ask for Preview" email integration for companies without previews
+- Rich company metadata display including market cap, sector, industry, year-end
 - Server-rendered data fetched directly from Supabase Postgres via `pg`
-- Lightweight Tailwind styling, revalidated every 60 seconds
+- Modern, professional UI with Tailwind CSS, revalidated every 60 seconds
 
 ## Prerequisites
 - Node.js 20+
@@ -22,7 +25,7 @@ Public Next.js site that surfaces upcoming earnings events from the Primer Repor
    ```
    The script prints the Supabase Postgres URL using `SUPABASE_PROJECT_ID` and `SUPABASE_DB_PASSWORD` from the keychain. If you prefer to edit manually, ensure `DATABASE_URL` includes `sslmode=require`.
 5. Start the app: `npm run dev`
-6. Visit http://localhost:3000 for the calendar and http://localhost:3000/previews for the preview dashboard.
+6. Visit http://localhost:3000 for the earnings calendar.
 
 ## Testing & Linting
 - `npm run lint` – Next.js/ESLint checks
@@ -31,8 +34,8 @@ Public Next.js site that surfaces upcoming earnings events from the Primer Repor
 ## Data Access
 Queries live in `src/lib/queries.ts` and are executed server-side only. They join:
 - `librarian.earnings_calendar` for schedule metadata
-- `public.company` for ticker, friendly name, and sector info
-- `public.reports` filtered to `report_type_id = 6` (earnings previews) for storage links
+- `public.company` for comprehensive company data (ticker, friendly name, sector, industry, country, market cap, year-end)
+- `public.reports` filtered to `report_type_id = 6` and `generated_at >= NOW() - INTERVAL '14 days'` for recent earnings previews
 
 The Next.js pages run with `revalidate = 60`, so fresh data is pulled roughly once a minute in production. No secrets are ever sent to the client – only pre-rendered JSON.
 
@@ -45,17 +48,16 @@ See `.env.example` for the required key. Render deployment will also need the sa
 ```
 src/
   app/
-    page.tsx              # 30-day calendar view
-    previews/page.tsx     # Next 5 business days with preview links
-    layout.tsx            # Shared shell + navigation
+    page.tsx              # Main earnings calendar page
+    layout.tsx            # Shared layout with header and footer
+    api/health/route.ts   # Health check endpoint
   components/
-    CalendarView.tsx
-    PreviewsView.tsx
+    CalendarView.tsx      # Calendar with filtering and preview links
   lib/
-    businessDays.ts
-    db.ts
-    queries.ts
-    types.ts
+    businessDays.ts       # Business day calculations
+    db.ts                 # Postgres connection pool
+    queries.ts            # Database queries
+    types.ts              # TypeScript types
 scripts/
   print-database-url.sh   # Helper to echo DATABASE_URL from keychain secrets
 ```

@@ -1,5 +1,5 @@
 import { dbQuery } from "./db";
-import type { EarningsEvent, EarningsPreview } from "./types";
+import type { EarningsEvent } from "./types";
 
 type EarningsRow = {
   id: number;
@@ -12,9 +12,8 @@ type EarningsRow = {
   company_gics_sector: string | null;
   company_gics_industry: string | null;
   company_country: string | null;
-};
-
-type EarningsPreviewRow = EarningsRow & {
+  company_year_end: string | null;
+  company_market_cap_million: number | null;
   preview_id: string | null;
   preview_name: string | null;
   preview_storage_url: string | null;
@@ -22,7 +21,7 @@ type EarningsPreviewRow = EarningsRow & {
 };
 
 function mapRow(row: EarningsRow): EarningsEvent {
-  return {
+  const event: EarningsEvent = {
     id: row.id,
     date: row.date,
     source: row.source,
@@ -34,24 +33,22 @@ function mapRow(row: EarningsRow): EarningsEvent {
       gicsSector: row.company_gics_sector,
       gicsIndustry: row.company_gics_industry,
       country: row.company_country,
+      yearEnd: row.company_year_end,
+      marketCapMillion: row.company_market_cap_million,
     },
   };
-}
 
-function mapPreviewRow(row: EarningsPreviewRow): EarningsPreview {
-  const base = mapRow(row);
+  // Add preview if available
   if (row.preview_id && row.preview_storage_url) {
-    return {
-      ...base,
-      preview: {
-        reportId: row.preview_id,
-        name: row.preview_name ?? "Earnings Preview",
-        storageUrl: row.preview_storage_url,
-        generatedAt: row.preview_generated_at ?? "",
-      },
+    event.preview = {
+      reportId: row.preview_id,
+      name: row.preview_name ?? "Earnings Preview",
+      storageUrl: row.preview_storage_url,
+      generatedAt: row.preview_generated_at ?? "",
     };
   }
-  return base;
+
+  return event;
 }
 
 export async function fetchEarningsCalendar(params: {
@@ -62,56 +59,7 @@ export async function fetchEarningsCalendar(params: {
 
   const { rows } = await dbQuery<EarningsRow>(
     `
-      SELECT
-        ec.id,
-        ec.date::text AS date,
-        ec.source,
-        ec.isin,
-        c.name AS company_name,
-        c.friendly_name AS company_friendly_name,
-        c.ticker AS company_ticker,
-        c.gics_sector AS company_gics_sector,
-        c.gics_industry AS company_gics_industry,
-        c.country AS company_country
-      FROM librarian.earnings_calendar ec
-      LEFT JOIN public.company c ON c.isin = ec.isin
-      WHERE ec.date BETWEEN $1::date AND $2::date
-      ORDER BY ec.date ASC, c.ticker NULLS LAST, c.name NULLS LAST;
-    `,
-    [startDate, endDate]
-  );
-
-  return rows.map(mapRow);
-}
-
-export async function fetchPreviewsForDates(params: {
-  isoDates: string[];
-}): Promise<EarningsPreview[]> {
-  const { isoDates } = params;
-
-  if (isoDates.length === 0) {
-    return [];
-  }
-
-  const { rows } = await dbQuery<EarningsPreviewRow>(
-    `
-      WITH events AS (
-        SELECT
-          ec.id,
-          ec.date::text AS date,
-          ec.source,
-          ec.isin,
-          c.name AS company_name,
-          c.friendly_name AS company_friendly_name,
-          c.ticker AS company_ticker,
-          c.gics_sector AS company_gics_sector,
-          c.gics_industry AS company_gics_industry,
-          c.country AS company_country
-        FROM librarian.earnings_calendar ec
-        LEFT JOIN public.company c ON c.isin = ec.isin
-        WHERE ec.date = ANY ($1::date[])
-      ),
-      latest_previews AS (
+      WITH latest_previews AS (
         SELECT DISTINCT ON (r.isin)
           r.isin,
           r.id,
@@ -122,20 +70,35 @@ export async function fetchPreviewsForDates(params: {
         WHERE r.report_type_id = 6
           AND r.isin IS NOT NULL
           AND r.storage_url IS NOT NULL
+          AND r.generated_at >= NOW() - INTERVAL '14 days'
         ORDER BY r.isin, r.generated_at DESC
       )
       SELECT
-        e.*,
+        ec.id,
+        ec.date::text AS date,
+        ec.source,
+        ec.isin,
+        c.name AS company_name,
+        c.friendly_name AS company_friendly_name,
+        c.ticker AS company_ticker,
+        c.gics_sector AS company_gics_sector,
+        c.gics_industry AS company_gics_industry,
+        c.country AS company_country,
+        c.year_end AS company_year_end,
+        c.market_cap_m AS company_market_cap_million,
         lp.id AS preview_id,
         lp.name AS preview_name,
         lp.storage_url AS preview_storage_url,
         lp.generated_at::text AS preview_generated_at
-      FROM events e
-      LEFT JOIN latest_previews lp ON lp.isin = e.isin
-      ORDER BY e.date ASC, e.company_ticker NULLS LAST, e.company_name NULLS LAST;
+      FROM librarian.earnings_calendar ec
+      LEFT JOIN public.company c ON c.isin = ec.isin
+      LEFT JOIN latest_previews lp ON lp.isin = ec.isin
+      WHERE ec.date BETWEEN $1::date AND $2::date
+      ORDER BY ec.date ASC, c.ticker NULLS LAST, c.friendly_name NULLS LAST;
     `,
-    [isoDates]
+    [startDate, endDate]
   );
 
-  return rows.map(mapPreviewRow);
+  return rows.map(mapRow);
 }
+

@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-A Next.js web application that displays earnings calendar events from the Primer Reports Supabase database. The application shows upcoming earnings for the next 30 days and provides direct links to earnings preview reports for the next 5 business days.
+A Next.js web application that displays earnings calendar events from the Primer Reports Supabase database. The application shows upcoming earnings for the next 30 days with comprehensive filtering capabilities and provides direct links to earnings preview reports (generated within the last 2 weeks) or allows users to request new previews via email.
 
 **Live URL**: https://earnings-calendar-djoz.onrender.com
 **GitHub**: https://github.com/RuggG/earnings-calendar
@@ -16,17 +16,23 @@ A Next.js web application that displays earnings calendar events from the Primer
 
 1. **30-Day Calendar View** (`/`)
    - Lists all earnings events for the next 30 days
-   - Search functionality by ticker, company name, or ISIN
-   - Grouped by date with company details
-   - Shows source metadata
+   - Advanced filtering by:
+     - Sector (GICS)
+     - Industry (GICS)
+     - Country
+     - Minimum market cap
+     - Text search (ticker, company name, ISIN)
+   - Comprehensive company metadata display:
+     - Ticker, friendly name
+     - Sector, industry
+     - Country, year-end
+     - Market cap (formatted as $M or $B)
+   - Preview access:
+     - "View Preview" button for companies with recent reports (< 2 weeks old)
+     - "Ask for Preview" email link for companies without previews
+   - Grouped by date with clean, modern design
 
-2. **5-Day Previews View** (`/previews`)
-   - Focuses on next 5 business days only
-   - Displays earnings preview report links when available
-   - Filters reports by `report_type_id = 6` (earnings previews)
-   - Shows "Preview Pending" badge when no report exists
-
-3. **Health Check API** (`/api/health`)
+2. **Health Check API** (`/api/health`)
    - Simple endpoint returning `{ ok: true }`
    - Used by Render for health monitoring
 
@@ -52,8 +58,11 @@ A Next.js web application that displays earnings calendar events from the Primer
 
 **Tables Used**:
 1. `librarian.earnings_calendar` - earnings event schedule
-2. `public.company` - company metadata (joined via ISIN)
-3. `public.reports` - earnings preview reports (filtered by `report_type_id = 6`)
+2. `public.company` - comprehensive company metadata (joined via ISIN)
+   - Fields: ticker, friendly_name, gics_sector, gics_industry, country, year_end, market_cap_m
+3. `public.reports` - earnings preview reports
+   - Filtered by `report_type_id = 6` (earnings previews)
+   - **New:** Further filtered by `generated_at >= NOW() - INTERVAL '14 days'` for recency
 
 **Query Strategy**:
 - SQL joins for optimal performance
@@ -66,14 +75,12 @@ A Next.js web application that displays earnings calendar events from the Primer
 earnings-calendar/
 ├── src/
 │   ├── app/
-│   │   ├── page.tsx              # 30-day calendar page
-│   │   ├── previews/page.tsx     # 5-day previews page
+│   │   ├── page.tsx              # Main calendar page
 │   │   ├── api/health/route.ts   # Health check endpoint
-│   │   ├── layout.tsx            # Root layout with header
+│   │   ├── layout.tsx            # Root layout with header and footer
 │   │   └── globals.css           # Global styles
 │   ├── components/
-│   │   ├── CalendarView.tsx      # Calendar component with search
-│   │   └── PreviewsView.tsx      # Previews component with report links
+│   │   └── CalendarView.tsx      # Calendar with filtering and preview links
 │   └── lib/
 │       ├── db.ts                 # Postgres connection pool
 │       ├── queries.ts            # Database query functions
@@ -181,16 +188,17 @@ Located in `src/lib/businessDays.ts`:
 
 ### Database Queries
 
-**Two main queries** in `src/lib/queries.ts`:
+**Single consolidated query** in `src/lib/queries.ts`:
 
-1. `fetchEarningsCalendar()` - Simple calendar events
-2. `fetchPreviewsForDates()` - Events with preview report links
+1. `fetchEarningsCalendar()` - All calendar events with preview links
 
 **Preview Query Strategy**:
 - Uses CTE (Common Table Expression) for clarity
 - `DISTINCT ON (r.isin)` to get latest preview per company
-- Filters by `report_type_id = 6`
+- Filters by `report_type_id = 6` (earnings previews)
+- **Critical:** Filters by `generated_at >= NOW() - INTERVAL '14 days'` for recency
 - Orders by `generated_at DESC` to get most recent
+- Left joins to earnings calendar (all events shown, previews optional)
 
 ### Server Configuration
 
@@ -207,17 +215,18 @@ Without this, health checks timeout and deployment fails.
 
 ## Current Status
 
-### Latest Deployment
+### Latest Changes
 
-**Deploy ID**: `dep-d3rrntpr0fns73dtvim0`
-**Status**: Building/Deploying
-**Commit**: `1ced595` - "Redesign UI with modern, slick styling"
+**Major Update**: Consolidated to single-page application with advanced filtering
 
 **Recent Changes**:
-1. Complete UI redesign with modern gradient theme
-2. Enhanced component styling
-3. Improved search and navigation UX
-4. Better responsive design
+1. **Single Page Design**: Removed separate previews page, consolidated to main calendar
+2. **2-Week Recency Filter**: Previews now filtered to last 14 days only
+3. **Advanced Filtering**: Added sector, industry, country, and market cap filters
+4. **Enhanced Metadata**: Display comprehensive company information (market cap, year-end, etc.)
+5. **Email Integration**: "Ask for Preview" button creates pre-filled email to hello@primerapp.com
+6. **Professional UI**: Clean, modern design with violet accent color
+7. **Improved Layout**: Added footer, improved header with Primer branding
 
 ### Known Working State
 
@@ -346,14 +355,17 @@ cd ~/repos/deployment-tools/render-tools
 ### Suggested Enhancements
 
 1. **Filtering Options**:
-   - Filter by country
-   - Filter by sector/industry (GICS data available)
+   - ✅ Filter by country (IMPLEMENTED)
+   - ✅ Filter by sector/industry (IMPLEMENTED)
+   - ✅ Filter by market cap (IMPLEMENTED)
    - Date range picker
+   - Save filter preferences
 
 2. **Preview Report Enhancements**:
    - Preview thumbnail/first page
    - Download option
    - Report metadata display
+   - Track preview generation date
 
 3. **Performance**:
    - Add Redis caching layer
@@ -364,9 +376,11 @@ cd ~/repos/deployment-tools/render-tools
    - Email alerts for specific tickers
    - Export to calendar (iCal)
    - Historical earnings data view
+   - Watchlist functionality
 
 5. **Analytics**:
    - Track which previews are most viewed
+   - Track email requests for previews
    - User engagement metrics
 
 ### Technical Debt
@@ -408,5 +422,13 @@ cd ~/repos/deployment-tools/render-tools
 ---
 
 *Document created: 2025-10-21*
-*Last deployment: `1ced595` - Modern UI redesign*
-*Status: ✅ Fully functional, deployed, and documented*
+*Last updated: 2025-10-21*
+*Status: ✅ Fully functional, ready for deployment*
+
+**Key Changes This Session**:
+- Consolidated from 2-page to single-page application
+- Added 2-week recency filter for previews
+- Implemented comprehensive filtering (sector, industry, country, market cap)
+- Enhanced metadata display with market cap and year-end
+- Professional UI redesign with violet accent
+- Email integration for preview requests
