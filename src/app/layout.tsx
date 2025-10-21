@@ -27,31 +27,38 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} bg-slate-50 antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} bg-gradient-to-br from-slate-50 to-blue-50/30 antialiased`}
       >
         <div className="min-h-screen">
-          <header className="border-b border-slate-200 bg-white shadow-sm">
-            <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
-              <Link href="/" className="text-xl font-semibold text-slate-900">
-                Earnings Calendar
+          <header className="border-b border-blue-100/50 bg-white/80 backdrop-blur-sm">
+            <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <Link href="/" className="flex items-center gap-2 text-xl font-bold">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600">
+                  <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  Earnings Calendar
+                </span>
               </Link>
-              <nav className="flex items-center gap-6 text-sm font-medium text-slate-600">
+              <nav className="flex items-center gap-2">
                 <Link
                   href="/"
-                  className="transition hover:text-slate-900"
+                  className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
                 >
                   Calendar
                 </Link>
                 <Link
                   href="/previews"
-                  className="transition hover:text-slate-900"
+                  className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:from-blue-500 hover:to-indigo-500"
                 >
-                  Next 5 Business Days
+                  Next 5 Days
                 </Link>
               </nav>
             </div>
           </header>
-          <main className="mx-auto max-w-6xl px-6 py-10">{children}</main>
+          <main className="mx-auto max-w-7xl px-6 py-12">{children}</main>
         </div>
       </body>
     </html>
