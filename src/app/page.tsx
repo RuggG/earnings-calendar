@@ -24,7 +24,7 @@ export default async function Home() {
               AI Earnings Calendar
             </h1>
             <p className="text-base text-primary font-semibold">
-              World's first AI-powered earnings calendar
+              World&apos;s first AI-powered earnings calendar
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs">
