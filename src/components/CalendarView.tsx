@@ -257,26 +257,32 @@ export function CalendarView({ events }: Props) {
     setIsSubmitting(true);
 
     const event = requestModal.event;
-    const subject = `Request Earnings Preview for ${event.company.ticker ?? event.company.friendlyName ?? event.company.isin}`;
-    const body = `Hi,
 
-I would like to request an earnings preview for:
+    try {
+      const response = await fetch('/api/request-preview', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          company: event.company.friendlyName ?? event.company.name,
+          ticker: event.company.ticker,
+          date: formatDisplayDate(event.date),
+        }),
+      });
 
-Company: ${event.company.friendlyName ?? event.company.name}
-Ticker: ${event.company.ticker ?? 'N/A'}
-Earnings Date: ${formatDisplayDate(event.date)}
+      if (!response.ok) {
+        throw new Error('Failed to submit request');
+      }
 
-Please send the preview to: ${email}
-
-Thank you!`;
-
-    // Open mailto link
-    window.location.href = `mailto:hello@primerapp.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-
-    // Close modal after a short delay
-    setTimeout(() => {
+      // Success - close modal
       closeRequestModal();
-    }, 500);
+    } catch (error) {
+      console.error('Error submitting request:', error);
+      alert('Failed to submit request. Please try again.');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -709,7 +715,7 @@ Thank you!`;
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-md shadow-primary/20 transition-all hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                   disabled={isSubmitting || !email}
                 >
                   {isSubmitting ? 'Submitting...' : 'Submit Request'}
